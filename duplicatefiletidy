@@ -1,0 +1,116 @@
+#!/bin/bash
+
+EXE="`dirname $0`"
+FOLDERDATES="-f"
+SOFTLINKS=""
+SHORTCUTS=""
+SCAN=false
+
+POSITIONAL=()
+while [[ $# -gt 0 ]] 
+do
+	key="$1"
+	case $key in
+	    -D)
+	    SCAN=true
+	    shift
+	    ;;
+	    -x)
+	    FOLDERDATES=""
+	    shift
+	    ;;
+	    -l)
+	    SOFTLINKS="-l"
+	    shift
+	    ;;
+	    -s)
+	    SHORTCUTS="-s"
+	    shift
+	    ;;
+	    *)    # unknown option
+	    POSITIONAL+=("$1") # save it in an array for later
+	    shift # past argument
+	    ;;
+	esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+SOURCEFOLDER="$1"
+
+#
+# Check Params
+#
+
+if [ -z "$SOURCEFOLDER" ]; then
+        echo "duplicatefiletidy [-D] [-x] [-l] [-s] sourcefolder"
+	echo " -D - Scan and delete duplicates"
+        echo " -x - Do not use Folder Dates in sorting when scanning"
+	echo " -l - Create soft links in place of duplicates"
+	echo " -s - Create windows shortcuts in place of duplicates"
+        exit
+fi
+
+echo "Duplicate File Tidy"
+echo "==================="
+echo ""
+
+if [ "$SCAN" = "true" ]; then
+
+	#
+	# Check not already run
+	#
+
+	if [ -f "$SOURCEFOLDER/files.lst" ]; then	
+		echo "$SOURCEFOLDER/files.lst already exists, scan / delete not performed."
+		echo "If you wish to force scan / delete, please remove this file manually."
+		echo "Note, running -D a second time will not find any duplicates and will"
+		echo "be unable to create any links or shortcuts."
+		exit
+	fi
+
+fi
+
+if [ "$SCAN" = "true" ]; then
+
+	#
+	# Remove all files
+	#
+
+	echo "Removing old indexes"
+	/bin/rm -f "$SOURCEFOLDER/files.lst" "$SOURCEFOLDER/sortedfiles.lst"
+
+	#
+	# Calculate MD5 Sum for all files, noting date
+	#
+
+	echo "Calculating Checksum for All files in '$SOURCEFOLDER'"
+	find "$SOURCEFOLDER" -type f -exec "$EXE/md5sumd" $FOLDERDATES "{}" \; > "$SOURCEFOLDER/files.lst"
+
+fi
+
+echo "Sorting List of Files (Newest First)"
+sort -r "$SOURCEFOLDER/files.lst" > "$SOURCEFOLDER/sortedfiles.lst"
+
+BEFORE="Unknown"
+
+if [ "$SCAN" = "true" ]; then
+
+	echo "Calculating Disk Usage"
+	BEFORE="`du -s \"$SOURCEFOLDER\" | cut -f1`"
+	echo "Deleting Older Duplicates in List of Files: '$SOURCEFOLDER/files.lst'"
+	"$EXE/movedup" -D "$SOURCEFOLDER/sortedfiles.lst" > "$SOURCEFOLDER/sortedduplicates.txt"
+fi
+
+if [ ! -z "$SOFTLINKS$SHORTCUTS" ]; then
+	echo "Generating Shortcuts identified in List of Files: '$SOURCEFOLDER/files.lst'"
+	"$EXE/movedup" $SOFTLINKS $SHORTCUTS "$SOURCEFOLDER/sortedfiles.lst" > "$SOURCEFOLDER/sortedduplicates.txt"
+fi
+
+echo "Tidying Up"
+sort "$SOURCEFOLDER/sortedduplicates.txt" > "$SOURCEFOLDER/duplicates.txt"
+/bin/rm -f "$SOURCEFOLDER/sortedfiles.lst" "$SOURCEFOLDER/sortedduplicates.txt"
+
+AFTER="`du -s \"$SOURCEFOLDER\" | cut -f1`"
+
+echo "Disk Saving: $((100*($BEFORE-$AFTER)/$BEFORE))% ($(($BEFORE/1024))Mb -> $(($AFTER/1024))Mb)"
+
+echo "Auto Tidy Complete"
