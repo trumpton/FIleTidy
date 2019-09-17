@@ -1,6 +1,9 @@
 
 all: movedup md5sumd
 
+install: movedup md5sumd duplicatefiletidy
+	/bin/cp movedup md5sumd duplicatefiletidy ~/bin
+
 movedup: movedup.c
 	gcc movedup.c -o movedup
 
