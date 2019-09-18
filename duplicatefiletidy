@@ -1,6 +1,7 @@
 #!/bin/bash
 
 EXE="`dirname $0`"
+DOTFOLDERS=""
 FOLDERDATES="-f"
 SOFTLINKS=""
 SHORTCUTS=""
@@ -23,6 +24,10 @@ do
 	    SOFTLINKS="-l"
 	    shift
 	    ;;
+	    -a)
+	    DOTFOLDERS="true"
+	    shift
+	    ;;
 	    -s)
 	    SHORTCUTS="-s"
 	    shift
@@ -43,6 +48,7 @@ SOURCEFOLDER="$1"
 if [ -z "$SOURCEFOLDER" ]; then
         echo "duplicatefiletidy [-D] [-x] [-l] [-s] sourcefolder"
 	echo " -D - Scan and delete duplicates"
+	echo " -a - Include all folders, including hidden when scanning"
         echo " -x - Do not use Folder Dates in sorting when scanning"
 	echo " -l - Create soft links in place of duplicates"
 	echo " -s - Create windows shortcuts in place of duplicates"
@@ -82,8 +88,13 @@ if [ "$SCAN" = "true" ]; then
 	# Calculate MD5 Sum for all files, noting date
 	#
 
-	echo "Calculating Checksum for All files in '$SOURCEFOLDER'"
-	find "$SOURCEFOLDER" -type f -exec "$EXE/md5sumd" $FOLDERDATES "{}" \; > "$SOURCEFOLDER/files.lst"
+	if [ "$DOTFOLDERS" = "true" ]; then
+ 	  echo "Calculating Checksum for ALL files in '$SOURCEFOLDER' including files in hidden files"
+	  find "$SOURCEFOLDER" -mount -type f -exec "$EXE/md5sumd" $FOLDERDATES "{}" \; > "$SOURCEFOLDER/files.lst"
+	else
+	  echo "Calculating Checksum for files in '$SOURCEFOLDER' excluding files in hidden folders"
+	  find "$SOURCEFOLDER" -mount -type f -not -path '*/\.*' -exec "$EXE/md5sumd" $FOLDERDATES "{}" \; > "$SOURCEFOLDER/files.lst"
+	fi
 
 fi
 
